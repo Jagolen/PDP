@@ -11,7 +11,6 @@ int main(int argc, char *argv[]) {
   int rank, size;
   double a, b;
   MPI_Status status;
-  MPI_Request send,rec;
 
   MPI_Init(&argc, &argv);               /* Initialize MPI               */
   MPI_Comm_size(MPI_COMM_WORLD, &size); /* Get the number of processors */
@@ -26,19 +25,16 @@ int main(int argc, char *argv[]) {
 
   /* Exchange variable a, notice the send-recv order */
   if (rank == 0) {
-    MPI_Isend(&a, 1, MPI_DOUBLE, 1, rank+1, MPI_COMM_WORLD,&send);
-    MPI_Irecv(&b, 1, MPI_DOUBLE, size-1, rank, MPI_COMM_WORLD, &rec);
-    MPI_Wait(&rec, &status);
+    MPI_Send(&a, 1, MPI_DOUBLE, 1, rank+1, MPI_COMM_WORLD);
+    MPI_Recv(&b, 1, MPI_DOUBLE, size-1, rank, MPI_COMM_WORLD, &status);
     printf("Processor 0 got %f from processor %d\n", b,size-1);
   } else if (rank==size-1) {
-    MPI_Irecv(&b, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &rec);
-    MPI_Isend(&a, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD,&send);
-    MPI_Wait(&rec, &status);
+    MPI_Recv(&b, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &status);
+    MPI_Send(&a, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
     printf("Processor %d got %f from processor %d\n",rank, b,rank-1);
   } else{
-    MPI_Irecv(&b, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &rec);
-    MPI_Isend(&a, 1, MPI_DOUBLE, rank+1, rank+1, MPI_COMM_WORLD, &send);
-    MPI_Wait(&rec, &status);
+    MPI_Recv(&b, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &status);
+    MPI_Send(&a, 1, MPI_DOUBLE, rank+1, rank+1, MPI_COMM_WORLD);
     printf("Processor %d got %f from processor %d\n",rank, b, rank-1);
   }
 
