@@ -1,0 +1,19 @@
+With sbatch -n 1 integral2d.sh
+
+Integral is approx. 2.5580414075004643
+Time: 73.916832 s
+
+With sbatch -n 4 integral2d.sh
+
+Integral is approx. 2.5580414074895930
+Time: 19.053926 s
+
+With sbatch -n 16 integral2d.sh
+
+Integral is approx. 2.5580414074936408
+Time: 5.174249 s
+
+With sbatch -p node -n 32 integral2d.sh
+
+Integral is approx. 2.5580414074945272
+Time: 2.622842 s
