@@ -24,9 +24,13 @@ int main(int argc, char *argv[]) {
   chunk  = intervals/size;       /* (We assume this is an integer)   */
   istart = rank*chunk;           /* Calculate start and stop indices */
   istop  = (rank + 1)*chunk - 1; /* for the local loop               */
+  double t_beg, t_end;
+
 
   dx  = 1.0/(size*chunk);
   sum = 0.0;
+
+  t_beg = MPI_Wtime();
   for (i = istart; i <= istop; i++) { /* The local loop */
     double tmp = dx*(0.5 + i);
     sum += dx*4.0/(1.0 + tmp*tmp);
@@ -47,6 +51,10 @@ int main(int argc, char *argv[]) {
 	      rank equal to zero */
     MPI_Send(&sum, 1, MPI_DOUBLE, 0, rank, MPI_COMM_WORLD);
   }
+  
+  t_end = MPI_Wtime();
+
+  printf("Time: %1.2f\n",t_end-t_beg);
 
   MPI_Finalize(); /* Shut down and clean up MPI */
 

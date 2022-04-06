@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 int main(int argc, char *argv[]) {
-  int rank, size,i;
+  int rank, size;
   double a;
   MPI_Status status;
 
@@ -19,10 +19,15 @@ int main(int argc, char *argv[]) {
   /* Processor 0 send to all others */
   if (rank == 0) {
     a=999.999;
-    for (i=0;i<size;i++)
-      MPI_Send(&a, 1, MPI_DOUBLE, i, 111, MPI_COMM_WORLD);
-  } else {
-    MPI_Recv(&a, 1, MPI_DOUBLE, 0, 111, MPI_COMM_WORLD, &status);
+      MPI_Send(&a, 1, MPI_DOUBLE, rank+1, rank+1, MPI_COMM_WORLD);
+  }
+  else if(rank == size-1){
+    MPI_Recv(&a, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &status);
+    printf("Processor %d got %f\n", rank,a);
+  }
+ else {
+    MPI_Recv(&a, 1, MPI_DOUBLE, rank-1, rank, MPI_COMM_WORLD, &status);
+    MPI_Send(&a, 1, MPI_DOUBLE, rank+1, rank+1, MPI_COMM_WORLD);
     printf("Processor %d got %f\n", rank,a);
   }
 
