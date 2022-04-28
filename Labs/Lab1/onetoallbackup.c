@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
       printf("process %d sending to process %d\n", rank, reciever);
       MPI_Send(&a, 1, MPI_DOUBLE, reciever,reciever,MPI_COMM_WORLD);
     }
-    else if(rank < pow(2, maxsend+1) && rank > maxsend-1 ) {
+    else if(rank < pow(2, maxsend+1) && rank > maxsend+1 ) {
       MPI_Recv(&a, 1, MPI_DOUBLE, sender, rank, MPI_COMM_WORLD, &status);
       printf("Process %d recieving %f from %d\n", rank, a, sender);
     }
