@@ -27,11 +27,12 @@ int main(int argc, char *argv[]) {
     prev = (size + rank - 1) % size;
 
     int *matrix = (int*)malloc(n*m*sizeof(int));
+    int *temp = (int*)malloc(2*m*sizeof(int));
 
     for(int i = 0; i < m*n; i++){
         matrix[i] =  rank * m * n + i;
     }
-    if(rank==1){
+    if(rank==0){
         printf("BEFORE: RANK %d, matrix \n", rank);
         for(int i = 0; i<n; i++){
             for(int j = 0; j<m; j++){
@@ -47,16 +48,23 @@ int main(int argc, char *argv[]) {
     if(rank == 0){
         printf(" %d sending to %d with tag %d\n", rank, next, next);
         MPI_Send(&matrix[n*m - 2 * m], 1, contig, next, next, MPI_COMM_WORLD);
-        MPI_Recv(&matrix[n*m - 2 * m - 1], 1, contig, prev, rank, MPI_COMM_WORLD, &status);
+        MPI_Recv(temp, 1, contig, prev, rank, MPI_COMM_WORLD, &status);
     }
     else{
     printf("rank %d recieving from, %d with tag %d\n", rank, prev, rank);
-    MPI_Recv(&matrix[n*m - 2 * m], 1, contig, prev, rank, MPI_COMM_WORLD, &status);
+    MPI_Recv(temp, 1, contig, prev, rank, MPI_COMM_WORLD, &status);
     MPI_Send(&matrix[n*m - 2 * m], 1, contig, next, next, MPI_COMM_WORLD);
     }
+    int cot = 0;
+    for(int i = n*m-2*m; i<=n*m; i++){
+        matrix[i] = temp[cot];
+        cot++;
+    }
+
+    free(temp);
 
 
-    if(rank==1){
+    if(rank==0){
         printf("AFTER: RANK %d, matrix \n", rank);
         for(int i = 0; i<n; i++){
             for(int j = 0; j<m; j++){
