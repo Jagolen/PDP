@@ -74,9 +74,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-
-
-
+    free(matrix);
     MPI_Type_free(&contig);
     MPI_Finalize();
     return 0;
