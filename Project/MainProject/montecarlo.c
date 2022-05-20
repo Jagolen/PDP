@@ -20,10 +20,15 @@ int main(int argc, char **argv){
 	//To store timings
 	double local_time[4];
 	double *times;
+	double start_final, start_sub, end_final;
 
 	//Given constants
 	const int R = 15;
 	const double T = 100;
+
+	//Parameters used in the time loop
+	double u1, u2, a0, tau, tt;
+	int quarter_done, half_done, three_quarter_done, all_done;
 
 	//State and result vectors
 	double *w;
@@ -48,18 +53,47 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
-	//Initializing w, p and x
+	//Initializing x, w and p
 	x = (int*)malloc(7*sizeof(int));
 	w = (double*)malloc(15*sizeof(double));
 	p = (int*)calloc(15*7, sizeof(int));
 
 	//the initial values of x was given, the values are initialized
-	x[0] = 900; x[1] = 900; x[2] = 30; x[3] = 330; x[4] = 50; x[5] = 270; x[6] = 20;
+	const int x0[7] = {900, 900, 30, 330, 50, 270, 20};
 
 	//P is a constant and most values are zero which was initialized with calloc. The non zero elements are initialized
 	p[0] = 1; p[7] = -1; p[14] = -1; p[16] = 1; p[22] = 1; p[29] = -1; p[36] = -1; p[38] = 1; p[44] = -1; p[51] = -1; p[53] = 1; 
 	p[59] = -1; p[66] = -1; p[68] = 1; p[74] = -1; p[81] = -1; p[83] = 1; p[89] = -1; p[91] = 1; p[97] = -1; p[104] = -1;
 
+	//To generate different numbers every time the program is ran and gives different random numbers on the different processes
+	srand(time(0)+rank);
+
+
+	//Main loop
+	for(int iter = 0; iter<n; iter++){
+		//Time is reset and x is set to initial value
+		tt = 0;
+		for(int i = 0; i<7; i++) x[i] = x0[i];
+		quarter_done = 0;
+		half_done = 0;
+		three_quarter_done = 0;
+		all_done = 0;
+
+		//Time loop for every iteration
+		while(tt<T){
+			a0 = 0;
+			prop(x,w);
+			for(int i = 0; i<15;i++) a0 += w[i];
+			u1 = ((double)(rand()%(RAND_MAX-1)+1))/(RAND_MAX);
+			u2 = ((double)(rand()%(RAND_MAX-1)+1))/(RAND_MAX);
+			tau = -log(u1/a0);
+			tt += 10;
+		}
+
+	
+	}
+	double hi = MPI_Wtime();
+	printf("u1 = %lf, u2 = %lf, tau = %lf\n", u1, u2, tau);
 
 	//Freeing memory
 	free(x);
