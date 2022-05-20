@@ -6,7 +6,7 @@ BIN = montecarlo
 
 all: $(BIN)
 
-qsort: montecarlo.c montecarlo.h
+montecarlo: montecarlo.c montecarlo.h
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 	
 clean:
