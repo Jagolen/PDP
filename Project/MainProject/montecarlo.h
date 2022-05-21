@@ -9,3 +9,5 @@
 *@param w Result vector (propensities). Should be of length 15!
 */
 void prop(int *x, double *w);
+
+int write_output(const char *file_name, int *result, int num_experiments);

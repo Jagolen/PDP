@@ -18,22 +18,21 @@ int main(int argc, char **argv){
     char *output_name = argv[2];
 
 	//To store timings
-	double local_time[4];
+	double local_time[5] = {0, 0, 0, 0, 0};
 	double *times;
 	double start_final, start_sub, end_final;
 
-	//Given constants
-	const int R = 15;
+	//Given constant
 	const double T = 100;
 
 	//Parameters used in the time loop
-	double u1, u2, a0, tau, tt;
-	int quarter_done, half_done, three_quarter_done, all_done;
+	double u1, u2, a0, tau, tt, r_data;
+	int r, quarter_done, half_done, three_quarter_done, all_done;
 
 	//State and result vectors
 	double *w;
 	int *x, *p;
-	double *result;
+	int *result;
 
 	//For MPI
 	int rank, size;
@@ -53,22 +52,43 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
+	//Initializing windows to put the result and timings to rank 0, and allocates the memory
+	MPI_Win reswin;
+	MPI_Win timewin;
+	if(rank == 0){
+		MPI_Alloc_mem(num_experiments*sizeof(int), MPI_INFO_NULL, &result);
+		MPI_Win_create(result, num_experiments*sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &reswin);
+		MPI_Alloc_mem(5*size*sizeof(double), MPI_INFO_NULL, &times);
+		MPI_Win_create(times, 5*size*sizeof(double), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &timewin);
+	}
+	else{
+		MPI_Win_create(NULL, 0, sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &reswin);
+		MPI_Win_create(NULL, 0, sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &timewin);
+	}
+
+
 	//Initializing x, w and p
 	x = (int*)malloc(7*sizeof(int));
 	w = (double*)malloc(15*sizeof(double));
-	p = (int*)calloc(15*7, sizeof(int));
+	p = (int*)malloc(15*7*sizeof(int));
 
 	//the initial values of x was given, the values are initialized
 	const int x0[7] = {900, 900, 30, 330, 50, 270, 20};
 
-	//P is a constant and most values are zero which was initialized with calloc. The non zero elements are initialized
+	//P is a constant and most values are zero. The zero and non zero elements are initialized
+	for(int i = 0; i<(15*7);i++) p[i] = 0;
+
 	p[0] = 1; p[7] = -1; p[14] = -1; p[16] = 1; p[22] = 1; p[29] = -1; p[36] = -1; p[38] = 1; p[44] = -1; p[51] = -1; p[53] = 1; 
 	p[59] = -1; p[66] = -1; p[68] = 1; p[74] = -1; p[81] = -1; p[83] = 1; p[89] = -1; p[91] = 1; p[97] = -1; p[104] = -1;
 
 	//To generate different numbers every time the program is ran and gives different random numbers on the different processes
 	srand(time(0)+rank);
 
+	//Fences so the data has access to the windows
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, reswin);
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, timewin);
 
+	start_final = MPI_Wtime();
 	//Main loop
 	for(int iter = 0; iter<n; iter++){
 		//Time is reset and x is set to initial value
@@ -80,25 +100,99 @@ int main(int argc, char **argv){
 		all_done = 0;
 
 		//Time loop for every iteration
+		start_sub = MPI_Wtime();
 		while(tt<T){
+
+			//Calculating w using the prop function and then calculating the sum of w
 			a0 = 0;
 			prop(x,w);
 			for(int i = 0; i<15;i++) a0 += w[i];
+
+			/*
+			Draw two random uniform numbers between 0 and 1. 0 is excluded since log 0 is undefined
+
+			*/
 			u1 = ((double)(rand()%(RAND_MAX-1)+1))/(RAND_MAX);
 			u2 = ((double)(rand()%(RAND_MAX-1)+1))/(RAND_MAX);
-			tau = -log(u1/a0);
-			tt += 10;
-		}
 
-	
+			//Finding tau and r
+			tau = -log(u1)/a0;
+			r = 0;
+			r_data = w[0];
+			while(r_data < (a0*u2)){
+				r++;
+				r_data+=w[r];
+			}
+
+			//Updating x based on r
+			for(int i = 0; i<7; i++) x[i] += p[7*r+i];
+
+			//Updating the time
+			tt += tau;
+
+			//If a subinterval is passed, add to the mean time of that subinterval
+			if(quarter_done == 0 && tt>25){
+				local_time[0] += ((MPI_Wtime() - start_sub)/n);
+				quarter_done = 1;
+			}
+
+			if(tt>50 && half_done == 0){
+				local_time[1] += ((MPI_Wtime() - start_sub)/n);
+				half_done = 1;
+			}
+
+			if(tt>75 && three_quarter_done == 0){
+				local_time[2] += ((MPI_Wtime() - start_sub)/n);
+				three_quarter_done = 1;
+			}
+
+		}
+		local_time[3] += ((MPI_Wtime() - start_sub)/n);
+
+		//Send the x element to process 0 with put
+		MPI_Put(&x[0], 1, MPI_INT, 0, rank*n+iter, 1, MPI_INT, reswin);
 	}
-	double hi = MPI_Wtime();
-	printf("u1 = %lf, u2 = %lf, tau = %lf\n", u1, u2, tau);
+	local_time[4] = MPI_Wtime() - start_final;
+
+	//Sending the times to rank 0 with put
+	MPI_Put(local_time, 5, MPI_DOUBLE, 0, rank*5, 5, MPI_DOUBLE, timewin);
+
+	//Putting fences so the data can be accessed
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, reswin);
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, timewin);
+
+	//printing the times
+	if(rank == 0){
+		printf("Average times: \n");
+		printf("Rank\t T=25 \t\t T=50 \t\t T=75 \t\t T=100 \n");
+		for(int i = 0; i<size; i++) printf("%d \t %lf \t %lf \t %lf \t %lf \n", i, times[5*i], times[5*i+1], times[5*i+2], times[5*i+3]);
+
+		//Print the highest execution time
+		double max_time = times[4];
+		for(int i = 1; i<size; i++){
+			if(max_time < times[5*i+4]) max_time = times[5*i+4];
+		}
+		printf("Highest time: %lf\n", max_time);
+
+		//Write the output file
+        if (0 != write_output(output_name, result, num_experiments)) {
+            return 2;
+		}
+	}
 
 	//Freeing memory
 	free(x);
 	free(w);
 	free(p);
+
+
+	//Freeing the windows
+	MPI_Win_free(&reswin);
+	MPI_Win_free(&timewin);
+	if(rank == 0){
+		MPI_Free_mem(result);
+		MPI_Free_mem(times);
+	}
 
 	//Finalizing MPI and end the program
 	MPI_Finalize();
@@ -157,4 +251,26 @@ void prop(int *x, double *w) {
 	w[12] = (MU_M + DELTA_M) * x[5];
 	w[13] = OMEGA * x[6];
 	w[14] = MU_H * x[6];
+}
+
+
+//Function for writing the output
+int write_output(const char *file_name, int *result, int num_experiments) {
+	FILE *file;
+	if (NULL == (file = fopen(file_name, "w"))) {
+		perror("Couldn't open output file");
+		return -1;
+	}
+	for (int i = 0; i < num_experiments; i++) {
+		if (0 > fprintf(file, "%d ", result[i])) {
+			perror("Couldn't write to output file");
+		}
+	}
+	if (0 > fprintf(file, "\n")) {
+		perror("Couldn't write to output file");
+	}
+	if (0 != fclose(file)) {
+		perror("Warning: couldn't close output file");
+	}
+	return 0;
 }
